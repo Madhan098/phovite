@@ -42,11 +42,17 @@
                 </div>
                 
                 <!-- Event Type Badge -->
-                <div class="absolute top-3 left-3">
+                <div class="absolute top-3 left-3 flex flex-col gap-2">
                     <span
                         class="px-3 py-1.5 bg-gradient-to-r from-purple-500/30 to-pink-500/30 border border-purple-400/50 text-purple-200 text-xs rounded-full font-semibold backdrop-blur-xl shadow-lg">
                         {{ invite.event_type }}
                     </span>
+                    {% if invite.event_date %}
+                    <span class="event-status-badge px-3 py-1.5 text-xs rounded-full font-bold backdrop-blur-xl shadow-lg"
+                        data-event-date="{{ invite.event_date }}" data-event-time="{{ invite.event_time or '23:59' }}">
+                        <!-- Status will be set by JavaScript -->
+                    </span>
+                    {% endif %}
                 </div>
 
                 <!-- View Count Badge -->
@@ -317,6 +323,47 @@ document.getElementById('shareModal')?.addEventListener('click', function(e) {
         closeShareModal();
     }
 });
+
+// Check event expiry status
+function checkEventStatus() {
+    const badges = document.querySelectorAll('.event-status-badge');
+    const now = new Date();
+    
+    badges.forEach(badge => {
+        const eventDateStr = badge.dataset.eventDate;
+        const eventTimeStr = badge.dataset.eventTime || '23:59';
+        
+        if (!eventDateStr) return;
+        
+        // Try to parse the date
+        const eventDateTime = new Date(eventDateStr + ' ' + eventTimeStr);
+        
+        if (isNaN(eventDateTime.getTime())) {
+            badge.style.display = 'none';
+            return;
+        }
+        
+        if (now > eventDateTime) {
+            // Event has expired
+            badge.textContent = '⚠️ EXPIRED';
+            badge.className = badge.className + ' bg-red-500/90 border border-red-400 text-white';
+            badge.style.display = 'inline-block';
+        } else {
+            // Event is upcoming
+            const daysUntil = Math.ceil((eventDateTime - now) / (1000 * 60 * 60 * 24));
+            if (daysUntil <= 7) {
+                badge.textContent = `🔥 ${daysUntil} day${daysUntil !== 1 ? 's' : ''} left`;
+                badge.className = badge.className + ' bg-orange-500/90 border border-orange-400 text-white';
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+    });
+}
+
+// Run on page load
+checkEventStatus();
 
 // Initialize Lucide icons
 if (typeof lucide !== 'undefined') {

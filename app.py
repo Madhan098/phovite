@@ -102,6 +102,17 @@ class Invitation(db.Model):
     event_venue = db.Column(db.String(300), nullable=True)  # Event venue
     event_message = db.Column(db.Text, nullable=True)  # Custom message
     gallery_photos = db.Column(db.Text, nullable=True)  # JSON array of photo URLs
+    
+    # Event-specific fields
+    bride_name = db.Column(db.String(200), nullable=True)  # For weddings
+    groom_name = db.Column(db.String(200), nullable=True)  # For weddings
+    bride_photo = db.Column(db.Text, nullable=True)  # Base64 bride photo
+    groom_photo = db.Column(db.Text, nullable=True)  # Base64 groom photo
+    celebrant_photo = db.Column(db.Text, nullable=True)  # For birthdays/other events
+    couple_names = db.Column(db.String(400), nullable=True)  # For anniversaries
+    baby_name = db.Column(db.String(200), nullable=True)  # For baby showers
+    baby_gender = db.Column(db.String(50), nullable=True)  # For baby showers
+    company_name = db.Column(db.String(200), nullable=True)  # For corporate events
     location_name = db.Column(db.String(200), nullable=True)
     location_address = db.Column(db.String(500), nullable=True)
     location_lat = db.Column(db.Float, nullable=True)
@@ -121,6 +132,14 @@ class RSVP(db.Model):
     vibe_pass_url = db.Column(db.String(500), nullable=True)
     status = db.Column(db.String(50), default='attending')  # attending, declined
     date_responded = db.Column(db.DateTime, default=datetime.utcnow)
+
+class GuestPhoto(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    invitation_id = db.Column(db.Integer, db.ForeignKey('invitation.id'), nullable=False)
+    guest_name = db.Column(db.String(150), nullable=False)
+    photo_url = db.Column(db.String(500), nullable=False)
+    message = db.Column(db.Text, nullable=True)
+    date_uploaded = db.Column(db.DateTime, default=datetime.utcnow)
 
 # Create DB
 with app.app_context():
@@ -428,19 +447,20 @@ def refine_prompt():
         system_prompt = """
         You are an expert creative director and event planner. 
         Your goal is to take user input about an event and generate:
-        1. A HIGHLY DETAILED, artistic image generation prompt for an AI model (Flux/Midjourney style).
+        1. A HIGHLY DETAILED, artistic image generation prompt for creating an ELEGANT BORDER/FRAME DESIGN (NOT a full scene).
         2. A catchy, short title for the invitation card.
         3. A warm, inviting body text for the card (max 2 sentences).
 
         Return ONLY a JSON object with keys: "image_prompt", "card_title", "card_body".
         
-        CRITICAL: The image_prompt must be EXTREMELY detailed and visually rich. Include:
-        - Specific visual elements (objects, scenery, architecture)
-        - Lighting details (golden hour, neon glow, soft ambient, dramatic spotlights)
-        - Color palette (specific colors, gradients, contrasts)
-        - Texture and materials (velvet, marble, glass, metal, flowers)
-        - Atmosphere and mood (elegant, energetic, serene, luxurious)
-        - Composition (foreground, background, depth, perspective)
+        CRITICAL INSTRUCTIONS FOR image_prompt:
+        - Generate a DECORATIVE BORDER or FRAME design, NOT a full background scene
+        - The design should be elegant, ornate borders that frame content in the CENTER
+        - Focus on: floral borders, geometric patterns, elegant corners, decorative frames
+        - Include details about: border style, corner ornaments, edge decorations, pattern motifs
+        - The CENTER should remain CLEAR/WHITE/LIGHT for text and photos
+        - Border should be around the edges only
+        - Specify colors, textures, and ornamental details for the frame/border elements
         """
 
         user_prompt = f"""
@@ -450,60 +470,67 @@ def refine_prompt():
         Celebrant Name: {celebrant_name}
         Details: {details}
 
-        Create an EXTREMELY DETAILED, HIGHLY ARTISTIC visual description for the background image.
-        This should be a MASTERPIECE-QUALITY prompt that produces stunning, professional results.
+        Create a DECORATIVE BORDER/FRAME DESIGN prompt for an invitation card.
         
-        Include these elements in your description:
-        - Specific lighting (golden hour, neon glow, soft ambient, dramatic backlighting, cinematic lighting)
-        - Exact color palette with hex codes or specific color names
-        - Textures and materials (velvet, silk, marble, crystal, gold leaf, etc.)
-        - Atmospheric elements (fog, sparkles, confetti, floating elements)
-        - Depth and perspective (foreground, midground, background layers)
-        - Photographic style (bokeh, depth of field, wide angle, macro details)
-        - Mood and emotion (joyful, elegant, energetic, intimate, luxurious)
+        IMPORTANT: Design an ELEGANT BORDER around the edges, NOT a full background scene.
+        The center should remain clear/white for text and photos.
+        
+        Border Design Elements to include:
+        - Ornate corner decorations (floral, geometric, or thematic elements)
+        - Elegant edge patterns (vines, filigree, geometric borders, cultural motifs)
+        - Decorative accents specific to the event theme
+        - Color scheme and materials (gold foil, floral watercolor, geometric lines, etc.)
+        - Border width and style (delicate thin lines, ornate thick borders, minimalist modern, etc.)
+        - Symmetrical or asymmetrical composition
+        - Keep the CENTER AREA CLEAR and light-colored for content
         
         Based on the specific theme '{vibe}' for a {event_type}:
         
-        BIRTHDAY THEMES:
-        - Neon Party: Vibrant cyberpunk cityscape, glowing neon signs in electric pink/purple/blue, reflective wet streets, holographic party decorations, futuristic nightclub atmosphere, laser lights, energetic vibe
-        - Balloon Fest: Colorful balloons floating in sky, confetti rain, bright daylight, cheerful atmosphere, rainbow colors, party streamers, festive celebration mood
-        - Confetti Pop: Explosion of golden and colorful confetti, sparkles, celebration moment frozen in time, warm lighting, joyful energy, party poppers
-        - Cake Dreams: Whimsical candy land, pastel pink and cream colors, floating cake layers, sweet treats, dreamy soft lighting, magical bakery atmosphere
+        BIRTHDAY BORDER DESIGNS:
+        - Neon Party: Geometric neon lines border in electric pink/purple/blue, glowing corners with starburst effects, modern sharp angles, metallic gradients, futuristic frame style
+        - Balloon Fest: Playful balloon border along edges, confetti corner decorations, rainbow colored frame, cheerful party motifs, floating streamers as border elements
+        - Confetti Pop: Golden confetti scattered around border edges, sparkle corner accents, celebratory frame with party elements, warm metallic tones
+        - Cake Dreams: Whimsical dessert themed border, pastel pink and cream frosting-like decorative edges, sweet treat corner ornaments, soft watercolor style frame
         
-        WEDDING THEMES:
-        - Royal Elegance: Opulent ballroom, crystal chandeliers, gold ornate details, marble columns, velvet drapes in burgundy, warm golden lighting, baroque architecture
-        - Floral Romance: Lush garden with blooming roses and peonies, soft romantic lighting, golden hour glow, watercolor florals, dreamy pastel colors
-        - Classic White: Elegant white chapel, soft natural light, minimalist beauty, white roses, pristine marble, serene atmosphere
-        - Garden Dream: Enchanted garden, hanging lights, green foliage, fairy tale setting, twilight ambiance, romantic outdoor venue
+        WEDDING BORDER DESIGNS:
+        - Royal Elegance: Opulent gold baroque frame, ornate corner flourishes, crystal-like embellishments, regal filigree patterns, luxurious gilded border
+        - Floral Romance: Delicate roses and peonies forming border, soft watercolor floral corners, romantic vine patterns along edges, dreamy pastel floral frame
+        - Classic White: Minimalist elegant white and gold border, simple refined corners, clean lines, subtle pearl-like accents, sophisticated frame
+        - Garden Dream: Enchanted botanical border, green leaf patterns, hanging fairy lights corner details, natural floral frame, organic flowing design
         
-        PARTY THEMES:
-        - Disco Lights: Retro disco ball, colorful spotlights, dance floor, 70s vibes, mirror ball reflections, energetic party atmosphere
-        - Beach Vibes: Tropical beach sunset, palm trees, ocean waves, tiki torches, warm sand, relaxed summer party mood
-        - Retro Funk: 80s neon aesthetic, geometric patterns, vibrant colors, vintage party decorations, nostalgic atmosphere
-        - Glow Party: UV lights, neon paint splashes, blacklight effects, glowing elements, electric energy, modern club scene
+        PARTY BORDER DESIGNS:
+        - Disco Lights: Retro geometric border with disco ball motifs in corners, colorful spotlight ray patterns, 70s inspired frame, mirror ball reflections
+        - Beach Vibes: Tropical border with palm leaf corners, wave patterns along edges, sunset gradient frame, beach-themed decorative elements
+        - Retro Funk: 80s geometric pattern border, neon color blocks, vintage angular design, bold nostalgic frame style
+        - Glow Party: Neon paint splash border, UV light effect edges, glowing geometric corners, electric energy frame design
         
-        CORPORATE THEMES:
-        - Professional: Modern office space, clean lines, corporate blue/gray tones, professional lighting, sleek design, business atmosphere
-        - Modern Tech: Futuristic tech environment, holographic displays, blue digital elements, innovation theme, cutting-edge design
-        - Luxury Gold: Premium corporate setting, gold accents, marble surfaces, sophisticated lighting, high-end business venue
-        - Minimal Clean: Minimalist white space, geometric shapes, soft shadows, contemporary design, elegant simplicity
+        CORPORATE BORDER DESIGNS:
+        - Professional: Clean minimalist border, corporate blue/gray thin lines, modern geometric corners, sleek professional frame
+        - Modern Tech: Futuristic digital border, holographic edge effects, tech-inspired corner elements, blue circuit-like patterns, cutting-edge frame
+        - Luxury Gold: Premium gold accent border, marble texture corners, sophisticated frame design, high-end metallic elements
+        - Minimal Clean: Ultra-minimalist border, simple geometric lines, elegant white space frame, contemporary clean design
         
-        ANNIVERSARY THEMES:
-        - Romantic Rose: Red roses in full bloom, candlelight, intimate setting, warm romantic glow, elegant table setting
-        - Golden Years: Golden anniversary theme, warm amber lighting, vintage elegance, nostalgic atmosphere, timeless beauty
-        - Champagne: Luxury celebration, champagne bubbles, golden sparkles, elegant glassware, sophisticated party setting
-        - Starry Night: Night sky filled with stars, romantic evening, twinkling lights, dreamy atmosphere, celestial beauty
+        ANNIVERSARY BORDER DESIGNS:
+        - Romantic Rose: Blooming rose border, romantic red and gold corners, elegant floral frame, intimate decorative elements
+        - Golden Years: Vintage gold ornate border, classic decorative corners, nostalgic frame style, timeless elegant design
+        - Champagne: Luxury celebration border with bubbles and golden accents, sophisticated corner embellishments, elegant frame
+        - Starry Night: Celestial border with star patterns, twinkling corner elements, dreamy night sky inspired frame
         
-        BABY SHOWER THEMES:
-        - Baby Blue: Soft blue clouds, baby boy theme, gentle lighting, cute teddy bears, nursery atmosphere, peaceful mood
-        - Soft Pink: Delicate pink flowers, baby girl theme, soft pastel tones, sweet decorations, warm gentle lighting
-        - Pastel Rainbow: Soft rainbow colors, whimsical clouds, dreamy atmosphere, gender-neutral celebration, joyful mood
-        - Teddy Bear: Cozy nursery with teddy bears, warm brown tones, soft toys, comfortable setting, loving atmosphere
+        BABY SHOWER BORDER DESIGNS:
+        - Baby Blue: Soft blue cloud-like border, cute teddy bear corners, gentle pastel frame, nursery themed decorations
+        - Soft Pink: Delicate pink flower border, sweet corner embellishments, soft pastel frame, gentle baby girl theme
+        - Pastel Rainbow: Soft rainbow colored border, whimsical cloud corners, dreamy multi-color frame, gender-neutral design
+        - Teddy Bear: Adorable teddy bear themed border, warm brown tone corners, cozy frame with soft toy motifs
         
-        Make the description VERY SPECIFIC with 40-50 words.
-        Include exact colors, lighting details, specific objects, textures, and atmosphere.
-        CRITICAL: Do NOT include any text, words, letters, or typography in the image description.
-        Focus ONLY on creating a stunning visual background scene perfect for an invitation.
+        Make the border design description VERY SPECIFIC with 40-50 words.
+        Include exact colors, textures, patterns, and ornamental details.
+        
+        CRITICAL REQUIREMENTS:
+        - Do NOT include any text, words, letters, or typography in the design
+        - Focus on BORDERS and FRAMES around the edges
+        - Keep the CENTER AREA CLEAR (white/cream/light colored) for photos and text
+        - Design decorative elements around the EDGES and CORNERS only
+        - Create a beautiful frame that enhances but doesn't overpower the content
         """
 
         # Use actual available models from your API key
@@ -565,8 +592,21 @@ def generate_image():
         event_time = data.get('eventTime', '')
         event_venue = data.get('eventVenue', '')
         event_message = data.get('eventMessage', '')
+        event_type = data.get('eventType', 'General')
         
-        logging.info(f"Generating image for user {current_user.id}. Family: {family_name}, Celebrant: {celebrant_name}")
+        # Event-specific data
+        bride_name = data.get('brideName', '')
+        groom_name = data.get('groomName', '')
+        bride_photo = data.get('bridePhoto', '')
+        groom_photo = data.get('groomPhoto', '')
+        celebrant_photo = data.get('celebrantPhoto', '')
+        couple_names = data.get('coupleNames', '')
+        couple_photo = data.get('couplePhoto', '')
+        baby_name = data.get('babyName', '')
+        baby_gender = data.get('babyGender', '')
+        company_name = data.get('companyName', '')
+        
+        logging.info(f"Generating image for user {current_user.id}. Event: {event_type}, Family: {family_name}, Celebrant: {celebrant_name}")
 
         output_url = ""
 
@@ -595,83 +635,190 @@ def generate_image():
                 # Convert to base64 for display
                 image_bytes = response.content
                 
-                # COMPOSITE FAMILY NAME AND USER PHOTO IF AVAILABLE
+                # COMPOSITE PHOTOS BASED ON EVENT TYPE
                 try:
                     # Open background image
                     bg_img = Image.open(BytesIO(image_bytes)).convert("RGBA")
                     draw = ImageDraw.Draw(bg_img)
                     
-                    # Add Family Name at Top
+                    # Add Family Name at Top (for all events)
                     if family_name:
                         try:
-                            # Load font for family name (elegant, large)
                             try:
                                 font_family = ImageFont.truetype("arial.ttf", 60)
                             except:
                                 font_family = ImageFont.load_default()
                             
-                            # Get text size
                             bbox = draw.textbbox((0, 0), family_name, font=font_family)
                             text_width = bbox[2] - bbox[0]
-                            text_height = bbox[3] - bbox[1]
-                            
-                            # Position at top center
                             x = (bg_img.width - text_width) // 2
                             y = 30
                             
-                            # Draw text with outline for visibility
-                            # Outline
+                            # Draw text with outline
                             for adj_x in range(-3, 4):
                                 for adj_y in range(-3, 4):
                                     draw.text((x + adj_x, y + adj_y), family_name, font=font_family, fill='black')
-                            # Main text
-                            draw.text((x, y), family_name, font=font_family, fill='#c084fc')  # Purple color
-                            
-                            logging.info(f"✅ Family name '{family_name}' added to image!")
-                        except Exception as font_e:
-                            logging.error(f"Failed to add family name: {font_e}")
+                            draw.text((x, y), family_name, font=font_family, fill='#c084fc')
+                            logging.info(f"✅ Family name '{family_name}' added")
+                        except Exception as e:
+                            logging.error(f"Failed to add family name: {e}")
                     
-                    # Add user photo below family name
-                    if user_photo_url:
+                    # EVENT-SPECIFIC PHOTO COMPOSITING
+                    if event_type == 'Wedding' and bride_photo and groom_photo:
+                        # WEDDING: Bride (left) + Heart + Groom (right)
                         try:
-                            # Download user photo
+                            photo_size = (180, 180)
+                            y_position = 120 if family_name else 60
+                            
+                            # Process Bride Photo (Left)
+                            bride_img_data = bride_photo.split(',')[1] if ',' in bride_photo else bride_photo
+                            bride_img = Image.open(BytesIO(base64.b64decode(bride_img_data))).convert("RGBA")
+                            bride_img = bride_img.resize(photo_size, Image.Resampling.LANCZOS)
+                            
+                            # Create circular mask for bride
+                            mask = Image.new('L', photo_size, 0)
+                            mask_draw = ImageDraw.Draw(mask)
+                            mask_draw.ellipse((0, 0) + photo_size, fill=255)
+                            
+                            bride_circle = Image.new('RGBA', photo_size, (0, 0, 0, 0))
+                            bride_circle.paste(bride_img, (0, 0), mask)
+                            
+                            # Add pink border for bride
+                            border_draw = ImageDraw.Draw(bride_circle)
+                            border_draw.ellipse((0, 0, photo_size[0]-1, photo_size[1]-1), outline="#ec4899", width=5)
+                            
+                            # Process Groom Photo (Right)
+                            groom_img_data = groom_photo.split(',')[1] if ',' in groom_photo else groom_photo
+                            groom_img = Image.open(BytesIO(base64.b64decode(groom_img_data))).convert("RGBA")
+                            groom_img = groom_img.resize(photo_size, Image.Resampling.LANCZOS)
+                            
+                            groom_circle = Image.new('RGBA', photo_size, (0, 0, 0, 0))
+                            groom_circle.paste(groom_img, (0, 0), mask)
+                            
+                            # Add blue border for groom
+                            border_draw = ImageDraw.Draw(groom_circle)
+                            border_draw.ellipse((0, 0, photo_size[0]-1, photo_size[1]-1), outline="#3b82f6", width=5)
+                            
+                            # Calculate positions (side by side with gap)
+                            gap = 80  # Gap for heart symbol
+                            total_width = photo_size[0] * 2 + gap
+                            bride_x = (bg_img.width - total_width) // 2
+                            groom_x = bride_x + photo_size[0] + gap
+                            
+                            # Paste photos
+                            bg_img.paste(bride_circle, (bride_x, y_position), bride_circle)
+                            bg_img.paste(groom_circle, (groom_x, y_position), groom_circle)
+                            
+                            # Draw heart symbol in the middle
+                            try:
+                                heart_font = ImageFont.truetype("seguiemj.ttf", 60)  # Windows emoji font
+                            except:
+                                try:
+                                    heart_font = ImageFont.truetype("arial.ttf", 60)
+                                except:
+                                    heart_font = ImageFont.load_default()
+                            
+                            heart_x = bride_x + photo_size[0] + (gap - 40) // 2
+                            heart_y = y_position + (photo_size[1] - 60) // 2
+                            
+                            # Draw heart with glow effect
+                            for offset in range(5, 0, -1):
+                                alpha = 50 + (5 - offset) * 30
+                                draw.text((heart_x - offset, heart_y), "❤️", font=heart_font, fill=(255, 100, 100, alpha))
+                            draw.text((heart_x, heart_y), "❤️", font=heart_font, fill="#ff1744")
+                            
+                            logging.info("✅ Wedding photos composited with heart!")
+                        except Exception as e:
+                            logging.error(f"Wedding photo compositing failed: {e}")
+                    
+                    elif event_type == 'Birthday' and celebrant_photo:
+                        # BIRTHDAY: Single centered photo
+                        try:
+                            photo_size = (200, 200)
+                            y_position = 130 if family_name else 70
+                            
+                            photo_data = celebrant_photo.split(',')[1] if ',' in celebrant_photo else celebrant_photo
+                            user_img = Image.open(BytesIO(base64.b64decode(photo_data))).convert("RGBA")
+                            user_img = user_img.resize(photo_size, Image.Resampling.LANCZOS)
+                            
+                            # Create circular mask
+                            mask = Image.new('L', photo_size, 0)
+                            mask_draw = ImageDraw.Draw(mask)
+                            mask_draw.ellipse((0, 0) + photo_size, fill=255)
+                            
+                            circle = Image.new('RGBA', photo_size, (0, 0, 0, 0))
+                            circle.paste(user_img, (0, 0), mask)
+                            
+                            # Add colorful border
+                            border_draw = ImageDraw.Draw(circle)
+                            border_draw.ellipse((0, 0, photo_size[0]-1, photo_size[1]-1), outline="#c084fc", width=5)
+                            
+                            # Center position
+                            x = (bg_img.width - photo_size[0]) // 2
+                            bg_img.paste(circle, (x, y_position), circle)
+                            
+                            logging.info("✅ Birthday photo composited!")
+                        except Exception as e:
+                            logging.error(f"Birthday photo compositing failed: {e}")
+                    
+                    elif event_type == 'Anniversary' and couple_photo:
+                        # ANNIVERSARY: Couple photo
+                        try:
+                            photo_size = (200, 200)
+                            y_position = 130 if family_name else 70
+                            
+                            photo_data = couple_photo.split(',')[1] if ',' in couple_photo else couple_photo
+                            user_img = Image.open(BytesIO(base64.b64decode(photo_data))).convert("RGBA")
+                            user_img = user_img.resize(photo_size, Image.Resampling.LANCZOS)
+                            
+                            mask = Image.new('L', photo_size, 0)
+                            mask_draw = ImageDraw.Draw(mask)
+                            mask_draw.ellipse((0, 0) + photo_size, fill=255)
+                            
+                            circle = Image.new('RGBA', photo_size, (0, 0, 0, 0))
+                            circle.paste(user_img, (0, 0), mask)
+                            
+                            # Gold border for anniversary
+                            border_draw = ImageDraw.Draw(circle)
+                            border_draw.ellipse((0, 0, photo_size[0]-1, photo_size[1]-1), outline="#fbbf24", width=5)
+                            
+                            x = (bg_img.width - photo_size[0]) // 2
+                            bg_img.paste(circle, (x, y_position), circle)
+                            
+                            logging.info("✅ Anniversary photo composited!")
+                        except Exception as e:
+                            logging.error(f"Anniversary photo compositing failed: {e}")
+                    
+                    # Fallback to user_photo_url if provided
+                    elif user_photo_url:
+                        try:
                             photo_response = requests.get(user_photo_url, timeout=30)
                             if photo_response.status_code == 200:
                                 user_img = Image.open(BytesIO(photo_response.content)).convert("RGBA")
+                                photo_size = (200, 200)
+                                user_img = user_img.resize(photo_size, Image.Resampling.LANCZOS)
                                 
-                                # Resize and crop user photo to circle
-                                size = (200, 200) # Size of the photo bubble
-                                user_img = user_img.resize(size, Image.Resampling.LANCZOS)
-                                
-                                # Create circular mask
-                                mask = Image.new('L', size, 0)
+                                mask = Image.new('L', photo_size, 0)
                                 mask_draw = ImageDraw.Draw(mask)
-                                mask_draw.ellipse((0, 0) + size, fill=255)
+                                mask_draw.ellipse((0, 0) + photo_size, fill=255)
                                 
-                                # Create circular image
-                                output = Image.new('RGBA', size, (0, 0, 0, 0))
+                                output = Image.new('RGBA', photo_size, (0, 0, 0, 0))
                                 output.paste(user_img, (0, 0), mask)
                                 
-                                # Add purple border
-                                border_size = 5
                                 border_draw = ImageDraw.Draw(output)
-                                border_draw.ellipse((0, 0, size[0]-1, size[1]-1), outline="#c084fc", width=border_size)
+                                border_draw.ellipse((0, 0, photo_size[0]-1, photo_size[1]-1), outline="#c084fc", width=5)
                                 
-                                # Paste onto background (Below family name, centered)
-                                x = (bg_img.width - size[0]) // 2
-                                y = 120 if family_name else 50  # Lower if family name exists
-                                
+                                x = (bg_img.width - photo_size[0]) // 2
+                                y = 120 if family_name else 50
                                 bg_img.paste(output, (x, y), output)
                                 
-                                logging.info("✅ User photo composited successfully!")
-                            else:
-                                logging.warning("Could not download user photo for compositing")
-                        except Exception as photo_e:
-                            logging.error(f"User photo compositing failed: {photo_e}")
+                                logging.info("✅ User photo composited!")
+                        except Exception as e:
+                            logging.error(f"User photo compositing failed: {e}")
                     
                     # Save back to bytes
                     buffer = BytesIO()
-                    bg_img = bg_img.convert("RGB") # Convert back to RGB for JPEG
+                    bg_img = bg_img.convert("RGB")
                     bg_img.save(buffer, format="JPEG", quality=95)
                     image_bytes = buffer.getvalue()
                     
@@ -739,7 +886,17 @@ def generate_image():
                     event_time=event_time,
                     event_venue=event_venue,
                     event_message=event_message,
-                    location_name=location_name
+                    location_name=location_name,
+                    # Event-specific fields
+                    bride_name=bride_name if bride_name else None,
+                    groom_name=groom_name if groom_name else None,
+                    bride_photo=bride_photo if bride_photo else None,
+                    groom_photo=groom_photo if groom_photo else None,
+                    celebrant_photo=celebrant_photo if celebrant_photo else None,
+                    couple_names=couple_names if couple_names else None,
+                    baby_name=baby_name if baby_name else None,
+                    baby_gender=baby_gender if baby_gender else None,
+                    company_name=company_name if company_name else None
                 )
                 db.session.add(new_invite)
                 db.session.commit()
@@ -1119,6 +1276,85 @@ def get_invitation_id_by_link(share_link):
         
     except Exception as e:
         logging.error(f"Error fetching invitation ID: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/guest-photo-upload', methods=['POST'])
+def guest_photo_upload():
+    """Upload guest photo OR wishes to invitation"""
+    try:
+        invitation_id = request.form.get('invitation_id')
+        guest_name = request.form.get('guest_name')
+        guest_message = request.form.get('guest_message', '')
+        
+        if not invitation_id or not guest_name:
+            return jsonify({"success": False, "error": "Missing required fields"}), 400
+        
+        if not guest_message:
+            return jsonify({"success": False, "error": "Please provide a message or wishes"}), 400
+        
+        # Photo is OPTIONAL - check if provided
+        photo_url = None
+        has_photo = False
+        
+        if 'guest_photo' in request.files:
+            photo_file = request.files['guest_photo']
+            
+            # Check if file was actually selected
+            if photo_file and photo_file.filename != '':
+                # Convert photo to base64
+                photo_bytes = photo_file.read()
+                photo_base64 = base64.b64encode(photo_bytes).decode('utf-8')
+                photo_url = f"data:image/jpeg;base64,{photo_base64}"
+                has_photo = True
+        
+        # Save to database (photo_url can be None for text-only wishes)
+        new_entry = GuestPhoto(
+            invitation_id=invitation_id,
+            guest_name=guest_name,
+            photo_url=photo_url,
+            message=guest_message
+        )
+        
+        db.session.add(new_entry)
+        db.session.commit()
+        
+        if has_photo:
+            logging.info(f"Guest photo and message shared by {guest_name} for invitation {invitation_id}")
+        else:
+            logging.info(f"Guest wishes shared by {guest_name} for invitation {invitation_id}")
+        
+        return jsonify({
+            "success": True,
+            "message": "Shared successfully!",
+            "photo_id": new_entry.id,
+            "has_photo": has_photo
+        })
+        
+    except Exception as e:
+        logging.error(f"Error uploading guest content: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/guest-photos/<int:invitation_id>', methods=['GET'])
+def get_guest_photos(invitation_id):
+    """Get all guest photos for an invitation"""
+    try:
+        photos = GuestPhoto.query.filter_by(invitation_id=invitation_id).order_by(GuestPhoto.date_uploaded.desc()).all()
+        
+        photos_data = [{
+            'id': photo.id,
+            'guest_name': photo.guest_name,
+            'photo_url': photo.photo_url,
+            'message': photo.message,
+            'date_uploaded': photo.date_uploaded.strftime('%Y-%m-%d %H:%M:%S')
+        } for photo in photos]
+        
+        return jsonify({
+            "success": True,
+            "photos": photos_data
+        })
+        
+    except Exception as e:
+        logging.error(f"Error fetching guest photos: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':

@@ -65,22 +65,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const skeletonLoader = document.getElementById('skeletonLoader');
     const regenerateBtn = document.getElementById('regenerateBtn');
 
-    // Initialize Uploadcare
-    const widget = uploadcare.Widget('[role=uploadcare-uploader]');
-
-    // Custom validator for max size 40MB
-    widget.validators.push(function (fileInfo) {
-        if (fileInfo.size !== null && fileInfo.size > 40 * 1024 * 1024) {
-            throw new Error('File is too large. Maximum size is 40MB.');
-        }
-    });
-
-    widget.onUploadComplete(info => {
-        state.userPhotoUrl = info.cdnUrl;
-        console.log('Photo uploaded:', state.userPhotoUrl);
-        alert('Photo uploaded successfully!');
-    });
-
     // Function to render themes based on event type
     function renderThemes(eventType) {
         const themes = EVENT_THEMES[eventType] || EVENT_THEMES['Birthday'];
@@ -132,32 +116,175 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update state and render themes
         state.eventType = btn.dataset.event;
         renderThemes(state.eventType);
+        
+        // Update dynamic fields based on event type
+        updateDynamicFields(state.eventType);
     });
 
-    // Initialize with Birthday themes
+    // Function to show/hide dynamic fields based on event type
+    function updateDynamicFields(eventType) {
+        // Hide all event-specific field groups
+        document.getElementById('birthdayFields').classList.add('hidden');
+        document.getElementById('weddingFields').classList.add('hidden');
+        document.getElementById('anniversaryFields').classList.add('hidden');
+        document.getElementById('babyShowerFields').classList.add('hidden');
+        document.getElementById('corporateFields').classList.add('hidden');
+        document.getElementById('partyFields').classList.add('hidden');
+        
+        // Show the relevant fields based on event type
+        switch(eventType) {
+            case 'Birthday':
+                document.getElementById('birthdayFields').classList.remove('hidden');
+                break;
+            case 'Wedding':
+                document.getElementById('weddingFields').classList.remove('hidden');
+                break;
+            case 'Anniversary':
+                document.getElementById('anniversaryFields').classList.remove('hidden');
+                break;
+            case 'Baby Shower':
+                document.getElementById('babyShowerFields').classList.remove('hidden');
+                break;
+            case 'Corporate':
+                document.getElementById('corporateFields').classList.remove('hidden');
+                break;
+            case 'Party':
+                document.getElementById('partyFields').classList.remove('hidden');
+                break;
+        }
+    }
+
+    // Initialize with Birthday themes and fields
     renderThemes('Birthday');
+    updateDynamicFields('Birthday');
+
+    // Helper function to convert file to base64
+    async function fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = error => reject(error);
+        });
+    }
 
     // Generate Handler
     generateBtn.addEventListener('click', async () => {
-        // Get all input values
+        // Get common input values
         state.familyName = document.getElementById('familyName').value.trim();
-        state.celebrantName = document.getElementById('celebrantName').value.trim();
         state.eventDate = document.getElementById('eventDate').value.trim();
         state.eventTime = document.getElementById('eventTime').value.trim();
         state.eventVenue = document.getElementById('eventVenue').value.trim();
         state.eventMessage = document.getElementById('eventMessage').value.trim();
 
-        // Validation
-        if (!state.familyName) {
-            alert('Please enter the family name!');
-            return;
+        // Event-specific data collection and validation
+        let eventSpecificData = {};
+        
+        switch(state.eventType) {
+            case 'Birthday':
+                state.celebrantName = document.getElementById('celebrantName').value.trim();
+                const celebrantPhotoFile = document.getElementById('celebrantPhoto').files[0];
+                
+                if (!state.celebrantName) {
+                    alert('Please enter the birthday person\'s name!');
+                    return;
+                }
+                if (!celebrantPhotoFile) {
+                    alert('Please upload a photo of the birthday person!');
+                    return;
+                }
+                
+                eventSpecificData.celebrantName = state.celebrantName;
+                eventSpecificData.celebrantPhoto = await fileToBase64(celebrantPhotoFile);
+                break;
+                
+            case 'Wedding':
+                const brideName = document.getElementById('brideName').value.trim();
+                const groomName = document.getElementById('groomName').value.trim();
+                const bridePhotoFile = document.getElementById('bridePhoto').files[0];
+                const groomPhotoFile = document.getElementById('groomPhoto').files[0];
+                
+                if (!brideName) {
+                    alert('Please enter the bride\'s name!');
+                    return;
+                }
+                if (!groomName) {
+                    alert('Please enter the groom\'s name!');
+                    return;
+                }
+                if (!bridePhotoFile) {
+                    alert('Please upload the bride\'s photo!');
+                    return;
+                }
+                if (!groomPhotoFile) {
+                    alert('Please upload the groom\'s photo!');
+                    return;
+                }
+                
+                eventSpecificData.brideName = brideName;
+                eventSpecificData.groomName = groomName;
+                eventSpecificData.bridePhoto = await fileToBase64(bridePhotoFile);
+                eventSpecificData.groomPhoto = await fileToBase64(groomPhotoFile);
+                state.celebrantName = `${brideName} & ${groomName}`;
+                break;
+                
+            case 'Anniversary':
+                const coupleNames = document.getElementById('coupleNames').value.trim();
+                const couplePhotoFile = document.getElementById('couplePhoto').files[0];
+                
+                if (!coupleNames) {
+                    alert('Please enter the couple\'s names!');
+                    return;
+                }
+                
+                eventSpecificData.coupleNames = coupleNames;
+                if (couplePhotoFile) {
+                    eventSpecificData.couplePhoto = await fileToBase64(couplePhotoFile);
+                }
+                state.celebrantName = coupleNames;
+                break;
+                
+            case 'Baby Shower':
+                const babyName = document.getElementById('babyName').value.trim() || 'Little One';
+                const babyGender = document.getElementById('babyGender').value;
+                
+                eventSpecificData.babyName = babyName;
+                eventSpecificData.babyGender = babyGender;
+                state.celebrantName = babyName;
+                break;
+                
+            case 'Corporate':
+                const companyName = document.getElementById('companyName').value.trim();
+                const corporateEventName = document.getElementById('corporateEventName').value.trim();
+                
+                if (!companyName) {
+                    alert('Please enter the company name!');
+                    return;
+                }
+                if (!corporateEventName) {
+                    alert('Please enter the event name!');
+                    return;
+                }
+                
+                eventSpecificData.companyName = companyName;
+                eventSpecificData.corporateEventName = corporateEventName;
+                state.celebrantName = corporateEventName;
+                break;
+                
+            case 'Party':
+                const partyName = document.getElementById('partyName').value.trim();
+                
+                if (!partyName) {
+                    alert('Please enter the event name!');
+                    return;
+                }
+                
+                eventSpecificData.partyName = partyName;
+                state.celebrantName = partyName;
+                break;
         }
 
-        if (!state.celebrantName) {
-            alert('Please enter the celebrant name!');
-            return;
-        }
-
+        // Common validation
         if (!state.eventDate) {
             alert('Please enter the event date!');
             return;
@@ -178,18 +305,23 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        if (!state.userPhotoUrl) {
-            alert('Please upload a photo to continue!');
-            return;
-        }
-
         setButtonLoading(generateBtn, true);
+        
+        // Show progress indicator
+        showProgressIndicator();
+        updateProgressStep(1, 'active');
 
         try {
-            // Build detailed prompt
-            const details = `Join us for ${state.celebrantName}'s ${state.eventType} celebration! ${state.eventDate} at ${state.eventTime} at ${state.eventVenue}. ${state.eventMessage}`;
+            // Build detailed welcoming prompt
+            let details = '';
+            if (state.eventType === 'Wedding' && eventSpecificData.brideName && eventSpecificData.groomName) {
+                details = `With joyous hearts, the ${state.familyName || 'family'} invites you to celebrate the sacred union of ${eventSpecificData.brideName} and ${eventSpecificData.groomName}. Please join us on ${state.eventDate} at ${state.eventTime} at ${state.eventVenue}. ${state.eventMessage || 'as their beautiful love story begins.'}`;
+            } else {
+                details = `With joyous hearts, we invite you to celebrate ${state.celebrantName}'s special ${state.eventType}! Please join us on ${state.eventDate} at ${state.eventTime} at ${state.eventVenue}. ${state.eventMessage}`;
+            }
 
             // Step 1: Refine Prompt with Enhanced Details (Gemini)
+            updateProgressStep(1, 'active');
             const refineResponse = await fetch('/api/refine-prompt', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -212,8 +344,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!refineResult.success) throw new Error(refineResult.error);
 
             state.generatedData = refineResult.data;
+            updateProgressStep(1, 'completed');
+            
+            // Small delay for visual feedback
+            await new Promise(resolve => setTimeout(resolve, 500));
 
-            // Step 2: Generate Image
+            // Step 2: Generate Image & Process Photos
+            updateProgressStep(2, 'active');
             const imageResponse = await fetch('/api/generate-image', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -230,13 +367,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     eventTime: state.eventTime,
                     eventVenue: state.eventVenue,
                     eventMessage: state.eventMessage,
-                    location_name: state.eventVenue
+                    location_name: state.eventVenue,
+                    ...eventSpecificData  // Spread event-specific data
                 })
             });
 
             const imageResult = await imageResponse.json();
             if (!imageResult.success) throw new Error(imageResult.error);
 
+            updateProgressStep(2, 'completed');
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Step 3: Compositing
+            updateProgressStep(3, 'active');
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate compositing time
+            updateProgressStep(3, 'completed');
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Step 4: Finalizing
+            updateProgressStep(4, 'active');
+            
             // Store invitation data FIRST (before displaying)
             if (imageResult.invitation_id) {
                 state.invitation_id = imageResult.invitation_id;
@@ -244,11 +394,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log('Invitation created with ID:', state.invitation_id);
             }
 
-            // Display results (now state.invitation_id is available)
+            await new Promise(resolve => setTimeout(resolve, 800));
+            updateProgressStep(4, 'completed');
+
+            // Hide progress and display results
+            await new Promise(resolve => setTimeout(resolve, 500));
+            hideProgressIndicator();
+            
+            // Display results and auto-scroll to preview
             displayResults(imageResult.image_url);
+            
+            // Auto-scroll to result section
+            setTimeout(() => {
+                resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 300);
 
         } catch (error) {
             console.error('Generation error:', error);
+            hideProgressIndicator();
             alert(`Error: ${error.message}`);
         } finally {
             setButtonLoading(generateBtn, false);
@@ -265,18 +428,10 @@ document.addEventListener('DOMContentLoaded', () => {
         generatedImage.style.display = 'block';
         skeletonLoader.style.display = 'none';
 
-        // Display family name
+        // Display text elements (Photos are already in the composited background image)
         const familyNameText = document.getElementById('familyNameText');
         if (familyNameText) {
             familyNameText.textContent = state.familyName;
-        }
-
-        // Display user photo
-        const userPhotoContainer = document.getElementById('userPhotoContainer');
-        const userPhotoOverlay = document.getElementById('userPhotoOverlay');
-        if (state.userPhotoUrl && userPhotoContainer && userPhotoOverlay) {
-            userPhotoOverlay.src = state.userPhotoUrl;
-            userPhotoContainer.classList.remove('hidden');
         }
 
         // Display celebrant name
@@ -397,6 +552,56 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             button.innerHTML = button.dataset.originalText || button.innerHTML;
             button.disabled = false;
+        }
+    }
+
+    // Progress indicator functions
+    function showProgressIndicator() {
+        const progressDiv = document.getElementById('progressIndicator');
+        if (progressDiv) {
+            progressDiv.classList.remove('hidden');
+            // Scroll to it
+            setTimeout(() => {
+                progressDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+        }
+    }
+
+    function hideProgressIndicator() {
+        const progressDiv = document.getElementById('progressIndicator');
+        if (progressDiv) {
+            progressDiv.classList.add('hidden');
+        }
+    }
+
+    function updateProgressStep(stepNumber, status) {
+        const step = document.querySelector(`.progress-step[data-step="${stepNumber}"]`);
+        if (!step) return;
+
+        const icon = step.querySelector('.step-icon');
+        const statusIcon = step.querySelector('.step-status');
+        const progressBar = document.getElementById('progressBar');
+
+        if (status === 'active') {
+            // Highlight current step
+            icon.classList.remove('bg-slate-700');
+            icon.classList.add('bg-purple-500', 'animate-pulse');
+            icon.querySelector('i').classList.remove('text-gray-400');
+            icon.querySelector('i').classList.add('text-white');
+        } else if (status === 'completed') {
+            // Mark as completed
+            icon.classList.remove('animate-pulse', 'bg-purple-500');
+            icon.classList.add('bg-green-500');
+            statusIcon.classList.remove('hidden');
+            
+            // Update progress bar
+            const progress = (stepNumber / 4) * 100;
+            progressBar.style.width = `${progress}%`;
+            
+            // Re-initialize lucide icons
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
         }
     }
 });
