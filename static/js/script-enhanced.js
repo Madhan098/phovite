@@ -309,6 +309,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Show progress indicator
         showProgressIndicator();
+        
+        // Small delay to ensure DOM is updated
+        await new Promise(resolve => setTimeout(resolve, 150));
         updateProgressStep(1, 'active');
 
         try {
@@ -559,6 +562,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function showProgressIndicator() {
         const progressDiv = document.getElementById('progressIndicator');
         if (progressDiv) {
+            // Reset all steps first
+            resetProgressSteps();
             progressDiv.classList.remove('hidden');
             // Scroll to it
             setTimeout(() => {
@@ -574,6 +579,33 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function resetProgressSteps() {
+        // Reset all steps to initial state
+        const steps = document.querySelectorAll('.progress-step');
+        steps.forEach(step => {
+            const icon = step.querySelector('.step-icon');
+            const statusIcon = step.querySelector('.step-status');
+            if (icon) {
+                icon.classList.remove('bg-purple-500', 'bg-green-500', 'animate-pulse');
+                icon.classList.add('bg-slate-700');
+                const iconElement = icon.querySelector('i') || icon.querySelector('svg');
+                if (iconElement) {
+                    iconElement.classList.remove('text-white');
+                    iconElement.classList.add('text-gray-400');
+                }
+            }
+            if (statusIcon) {
+                statusIcon.classList.add('hidden');
+            }
+        });
+        
+        // Reset progress bar
+        const progressBar = document.getElementById('progressBar');
+        if (progressBar) {
+            progressBar.style.width = '0%';
+        }
+    }
+
     function updateProgressStep(stepNumber, status) {
         const step = document.querySelector(`.progress-step[data-step="${stepNumber}"]`);
         if (!step) return;
@@ -582,21 +614,32 @@ document.addEventListener('DOMContentLoaded', () => {
         const statusIcon = step.querySelector('.step-status');
         const progressBar = document.getElementById('progressBar');
 
+        // Add null checks to prevent errors
+        if (!icon) return;
+
         if (status === 'active') {
             // Highlight current step
             icon.classList.remove('bg-slate-700');
             icon.classList.add('bg-purple-500', 'animate-pulse');
-            icon.querySelector('i').classList.remove('text-gray-400');
-            icon.querySelector('i').classList.add('text-white');
+            // Try both i and svg (Lucide converts i to svg)
+            const iconElement = icon.querySelector('i') || icon.querySelector('svg');
+            if (iconElement) {
+                iconElement.classList.remove('text-gray-400');
+                iconElement.classList.add('text-white');
+            }
         } else if (status === 'completed') {
             // Mark as completed
-            icon.classList.remove('animate-pulse', 'bg-purple-500');
+            icon.classList.remove('animate-pulse', 'bg-purple-500', 'bg-slate-700');
             icon.classList.add('bg-green-500');
-            statusIcon.classList.remove('hidden');
+            if (statusIcon) {
+                statusIcon.classList.remove('hidden');
+            }
             
             // Update progress bar
-            const progress = (stepNumber / 4) * 100;
-            progressBar.style.width = `${progress}%`;
+            if (progressBar) {
+                const progress = (stepNumber / 4) * 100;
+                progressBar.style.width = `${progress}%`;
+            }
             
             // Re-initialize lucide icons
             if (typeof lucide !== 'undefined') {
