@@ -658,7 +658,7 @@ async function generateVideoWithMusic(musicChoice) {
             body: JSON.stringify({
                 invitation_id: invitation_id,
                 music: musicChoice,
-                duration: 10 // 10 seconds as requested
+                duration: 12 // 12 seconds (10-15s range)
             })
         });
 

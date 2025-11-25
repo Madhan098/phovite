@@ -998,19 +998,19 @@ def upload_voice():
 @app.route('/api/generate-video', methods=['POST'])
 @login_required
 def generate_video():
-    """Generate a 5-10s hype video from invitation with optional music"""
+    """Generate a 10-15s hype video from invitation with optional music"""
     try:
         logging.info("🎬 Video generation started")
         
         data = request.json
         invitation_id = data.get('invitation_id')
         music_choice = data.get('music')  # Can be None or a music type
-        duration = data.get('duration', 10)  # Default 10 seconds
+        duration = data.get('duration', 12)  # Default 12 seconds
         
         logging.info(f"Video request - ID: {invitation_id}, Music: {music_choice}, Duration: {duration}s")
         
-        # Ensure duration is between 5-10 seconds
-        duration = max(5, min(10, duration))
+        # Ensure duration is between 10-15 seconds
+        duration = max(10, min(15, duration))
         
         invitation = Invitation.query.get(invitation_id)
         if not invitation:
