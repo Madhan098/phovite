@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ invitation.title }} - PhoVite</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Playfair Display', 'serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+
+<body class="bg-slate-950 text-white min-h-screen flex flex-col">
+    <!-- Main Invitation Content (No Header/Footer) -->
+    <div class="flex-grow flex items-center justify-center p-4 md:p-8">
+        <div class="max-w-2xl w-full">
+            <!-- Invitation Card -->
+            <div class="relative rounded-3xl overflow-hidden shadow-2xl">
+                <!-- Background Image -->
+                <img src="{{ invitation.image_url }}" alt="{{ invitation.title }}" class="w-full h-auto">
+                
+                <!-- Content Overlay -->
+                <div class="absolute inset-0 bg-gradient-to-b from-black/30 via-black/50 to-black/70 flex flex-col justify-center items-center p-8 text-center">
+                    
+                    {% if invitation.family_name %}
+                    <!-- Family Name -->
+                    <h1 class="text-3xl md:text-4xl font-display font-bold text-purple-300 mb-6">
+                        {{ invitation.family_name }}
+                    </h1>
+                    {% endif %}
+                    
+                    <!-- Celebrant Name -->
+                    <h2 class="text-5xl md:text-7xl font-display font-bold text-white mb-8">
+                        {{ invitation.celebrant_name or invitation.title }}
+                    </h2>
+                    
+                    <!-- Event Details -->
+                    <div class="space-y-4 mb-8">
+                        {% if invitation.event_date %}
+                        <div class="flex items-center justify-center gap-3">
+                            <i data-lucide="calendar" class="w-6 h-6 text-pink-400"></i>
+                            <p class="text-2xl text-white font-semibold">{{ invitation.event_date }}</p>
+                        </div>
+                        {% endif %}
+                        
+                        {% if invitation.event_time %}
+                        <div class="flex items-center justify-center gap-3">
+                            <i data-lucide="clock" class="w-6 h-6 text-blue-400"></i>
+                            <p class="text-2xl text-white font-semibold">{{ invitation.event_time }}</p>
+                        </div>
+                        {% endif %}
+                        
+                        {% if invitation.event_venue %}
+                        <div class="flex items-center justify-center gap-3">
+                            <i data-lucide="map-pin" class="w-6 h-6 text-green-400"></i>
+                            <p class="text-2xl text-white font-semibold">{{ invitation.event_venue }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Message -->
+                    {% if invitation.event_message or invitation.body %}
+                    <p class="text-lg md:text-xl text-gray-100 max-w-xl leading-relaxed">
+                        {{ invitation.event_message or invitation.body }}
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- RSVP Form (Below Invitation) -->
+            <div class="mt-8 bg-slate-900/80 backdrop-blur-xl rounded-3xl p-8 border border-purple-500/30">
+                <h3 class="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                    <i data-lucide="user-check" class="w-6 h-6 text-purple-400"></i>
+                    RSVP - Get Your Vibe Pass
+                </h3>
+                
+                <form id="rsvpForm" class="space-y-4">
+                    <input type="hidden" id="invitation_id" value="{{ invitation.id }}">
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-300 mb-2">Your Name *</label>
+                        <input type="text" id="guest_name" required
+                            class="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-300 mb-2">Your Email</label>
+                        <input type="email" id="guest_email"
+                            class="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-300 mb-2">Personal Message</label>
+                        <textarea id="guest_message" rows="3"
+                            class="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition resize-none"
+                            placeholder="Send a message to the host..."></textarea>
+                    </div>
+                    
+                    <button type="submit"
+                        class="w-full py-4 bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 hover:from-purple-500 hover:via-pink-500 hover:to-purple-500 text-white font-bold rounded-xl transition-all duration-300 shadow-2xl shadow-purple-500/40">
+                        Submit RSVP & Get Vibe Pass
+                    </button>
+                </form>
+            </div>
+            
+            <!-- RSVPs List -->
+            <div id="rsvpsList" class="mt-8 space-y-4">
+                <h4 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                    <i data-lucide="users" class="w-5 h-5 text-purple-400"></i>
+                    Who's Coming
+                </h4>
+                <div id="rsvpsContainer" class="space-y-3">
+                    <!-- RSVPs will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Made with PhoVite Footer -->
+    <div class="py-6 text-center">
+        <a href="https://phovite.com" target="_blank" class="inline-flex items-center gap-2 text-gray-400 hover:text-purple-400 transition text-sm">
+            <i data-lucide="sparkles" class="w-4 h-4"></i>
+            <span>Made with <span class="font-semibold">PhoVite</span></span>
+        </a>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Load existing RSVPs
+        async function loadRSVPs() {
+            const invitationId = document.getElementById('invitation_id').value;
+            
+            try {
+                const response = await fetch(`/api/get-rsvps/${invitationId}`);
+                const result = await response.json();
+                
+                if (result.success && result.rsvps.length > 0) {
+                    const container = document.getElementById('rsvpsContainer');
+                    container.innerHTML = result.rsvps.map(rsvp => `
+                        <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold">
+                                    ${rsvp.guest_name.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                    <p class="text-white font-semibold">${rsvp.guest_name}</p>
+                                    ${rsvp.guest_message ? `<p class="text-sm text-gray-400">${rsvp.guest_message}</p>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    document.getElementById('rsvpsContainer').innerHTML = '<p class="text-gray-500 text-center py-4">Be the first to RSVP!</p>';
+                }
+            } catch (error) {
+                console.error('Error loading RSVPs:', error);
+            }
+        }
+
+        // Submit RSVP Form
+        document.getElementById('rsvpForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = {
+                invitation_id: document.getElementById('invitation_id').value,
+                guest_name: document.getElementById('guest_name').value,
+                guest_email: document.getElementById('guest_email').value,
+                guest_message: document.getElementById('guest_message').value
+            };
+            
+            try {
+                const response = await fetch('/api/rsvp-submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('RSVP submitted successfully! Your Vibe Pass will be sent to your email.');
+                    
+                    // Reset form
+                    e.target.reset();
+                    
+                    // Reload RSVPs
+                    loadRSVPs();
+                    
+                    // Scroll to RSVPs list
+                    document.getElementById('rsvpsList').scrollIntoView({ behavior: 'smooth' });
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                console.error('RSVP error:', error);
+                alert('An error occurred. Please try again.');
+            }
+        });
+
+        // Load RSVPs on page load
+        loadRSVPs();
+    </script>
+</body>
+</html>
+
